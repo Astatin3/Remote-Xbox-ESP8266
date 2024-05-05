@@ -172,4 +172,4 @@ try:
     printState()
     s.send(getBytes())
 except:
-  print("\n\n\nClient not connected!")
+  print("\n\n\nError!")

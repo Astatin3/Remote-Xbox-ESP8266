@@ -1,15 +1,39 @@
 #include <ESP8266WiFi.h>
-// #include ""
 
-const char* ssid = "test";
-const char* password = "test";
+const char* ssid = "robotWifi";
+const char* password = "password";
 const int port = 12345;
+
+const int motorIn1 = 5; // D1
+const int motorIn2 = 4; // D2
+
+const int motor1EncoderPin1 = 14; // D5
+const int motor1EncoderPin2 = 12; // D6
+
+const bool reverseMotor1 = false;
+const bool reverseMotor2 = false;
+
+int motor1Count = 0;
 
 WiFiServer server(port);
 
+
+void IRAM_ATTR readEncoder();
+
 void setup() {
-  Serial.begin(115200);
   delay(10);
+  Serial.begin(115200);
+
+  pinMode(motorIn1, OUTPUT);
+  pinMode(motorIn2, OUTPUT);
+
+  pinMode(motor1EncoderPin1, INPUT);
+  pinMode(motor1EncoderPin2, INPUT);
+
+	digitalWrite(motorIn1, HIGH);
+	digitalWrite(motorIn2, HIGH);
+
+  attachInterrupt(digitalPinToInterrupt(motor1EncoderPin1), readEncoder, CHANGE);
 
   // Configure the ESP8266 as an access point
   WiFi.mode(WIFI_AP);
@@ -20,11 +44,12 @@ void setup() {
 
   Serial.println("Access Point created");
   Serial.print("SSID: ");
-  Serial.println(ssid);
+  Serial.println(WiFi.SSID());
   Serial.print("IP address: ");
   Serial.println(WiFi.softAPIP());
   Serial.print("Listening on port: ");
   Serial.println(port);
+
 }
 
 short bytesToShort(byte highByte, byte lowByte) {
@@ -61,14 +86,39 @@ bool btn_dpad_down = false;
 bool btn_dpad_left = false;
 bool btn_dpad_right = false;
 
+
+volatile bool encoderALast = LOW;
+volatile bool encoderBLast = LOW;
+
+void IRAM_ATTR readEncoder(){
+  bool encoderAState = digitalRead(motor1EncoderPin1);
+  bool encoderBState = digitalRead(motor1EncoderPin2);
+  
+  if (encoderBState != encoderAState) {
+    motor1Count++;
+  } else {
+    motor1Count--;
+  }
+
+  encoderALast = encoderAState;
+
+  Serial.println(motor1Count);
+}
+
+void controllerUpdate();
+void setMotor1(int speed);
+
+
 void loop() {
+  delay(10);
+  
   // Check if a client has connected
   WiFiClient client = server.available();
   if (client) {
     Serial.println("New client connected");
 
     // Read data from the client
-    while (client.connected()) {
+    // while (client.connected()) {
       if (client.available()) {
         byte buffer[14];
         client.readBytes(buffer, 14);
@@ -82,13 +132,6 @@ void loop() {
 
         bool buttons[16];
         bytesToBoolArray(buffer[12], buffer[13], buttons);
-
-
-        // if(buttons[0] != btn_A && !btn_A){
-        //   Serial.println("A pressed!");
-        // }else if (buttons[0] != btn_A && btn_A){
-        //   Serial.println("A Unpressed!");
-        // }
 
         btn_A = buttons[0];
         btn_B = buttons[1];
@@ -106,56 +149,89 @@ void loop() {
         btn_dpad_left = buttons[13];
         btn_dpad_right = buttons[14];
 
-        printController();
+        // printController();
+        controllerUpdate();
       }
-    }
+    // }
 
     // Close the connection
     client.stop();
     Serial.println("Client disconnected");
   }
-}
 
-
-String repeatString(String str, int count) {
-  String result = "";
-  for (int i = 0; i < count; i++) {
-    result += str;
-  }
-  return result;
-}
-
-String leftPad(String str, int targetWidth){
-  return repeatString(" ", (targetWidth - str.length())) + str;
-}
-
-String printButton(String str, bool isPressed){
-  if(isPressed){
-    return str;
+  static bool direction = false;
+  static int val = 0;
+  if(direction){
+    val++;
   }else{
-    return repeatString("-", str.length());
+    val--;
+  }
+
+
+  if(val >= 1023 || val <= -1024){
+    direction = !direction;
+  }
+
+  setMotor1(val);
+  Serial.println(val);
+
+}
+
+
+// String repeatString(String str, int count) {
+//   String result = "";
+//   for (int i = 0; i < count; i++) {
+//     result += str;
+//   }
+//   return result;
+// }
+
+// String leftPad(String str, int targetWidth){
+//   return repeatString(" ", (targetWidth - str.length())) + str;
+// }
+
+// String printButton(String str, bool isPressed){
+//   if(isPressed){
+//     return str;
+//   }else{
+//     return repeatString("-", str.length());
+//   }
+// }
+
+// void printController(){
+//   Serial.println("LS:[" + 
+//     leftPad(String(axis_ls_x), 6) + ", " + leftPad(String(axis_ls_y),6) + "] RS:[" + 
+//     leftPad(String(axis_rs_x), 6) + ", " + leftPad(String(axis_rs_y),6) + "] LT:" +
+//     leftPad(String(axis_lt), 4) + ", RT:" + 
+//     leftPad(String(axis_rt), 4) + " [" +
+//     printButton("A", btn_A) + 
+//     printButton("B", btn_B) + 
+//     printButton("X", btn_X) + 
+//     printButton("Y", btn_Y) + 
+//     printButton("LB", btn_LB) + 
+//     printButton("RB", btn_RB) + 
+//     printButton("LS", btn_LS) + 
+//     printButton("RS", btn_RS) + 
+//     printButton("@", btn_xbox) + 
+//     printButton("H", btn_home) + setMotor1
+//     printButton("M", btn_menu) + 
+//     printButton("^", btn_dpad_up) + 
+//     printButton("v", btn_dpad_down) + 
+//     printButton("<", btn_dpad_left) + 
+//     printButton(">", btn_dpad_right) + "]");
+// }
+
+void setMotor1(int speed){
+  Serial.println(speed);
+  if(speed > 0){
+    analogWrite(motorIn1, !reverseMotor1 ? speed : 0);
+    analogWrite(motorIn2,  reverseMotor1 ? speed : 0);
+  }else{
+    analogWrite(motorIn1, !reverseMotor1 ? abs(speed) : 0);
+    analogWrite(motorIn2,  reverseMotor1 ? abs(speed) : 0);
   }
 }
 
-void printController(){
-  Serial.println("LS:[" + 
-    leftPad(String(axis_ls_x), 6) + ", " + leftPad(String(axis_ls_y),6) + "] RS:[" + 
-    leftPad(String(axis_rs_x), 6) + ", " + leftPad(String(axis_rs_y),6) + "] LT:" +
-    leftPad(String(axis_lt), 4) + ", RT:" + 
-    leftPad(String(axis_rt), 4) + " [" +
-    printButton("A", btn_A) + 
-    printButton("B", btn_B) + 
-    printButton("X", btn_X) + 
-    printButton("Y", btn_Y) + 
-    printButton("LB", btn_LB) + 
-    printButton("RB", btn_RB) + 
-    printButton("LS", btn_LS) + 
-    printButton("RS", btn_RS) + 
-    printButton("@", btn_xbox) + 
-    printButton("H", btn_home) + 
-    printButton("M", btn_menu) + 
-    printButton("^", btn_dpad_up) + 
-    printButton("v", btn_dpad_down) + 
-    printButton("<", btn_dpad_left) + 
-    printButton(">", btn_dpad_right) + "]");
+void controllerUpdate() {
+  // setMotor1((int)((double)axis_ls_y/32));
 }
