@@ -171,5 +171,5 @@ try:
         
     printState()
     s.send(getBytes())
-except:
-  print("\n\n\nError!")
+except Exception as e:
+  print(f"\n\n\nError! ({e})")

@@ -7,8 +7,13 @@ const int port = 12345;
 const int motorIn1 = 5; // D1
 const int motorIn2 = 4; // D2
 
-const int motor1EncoderPin1 = 14; // D5
-const int motor1EncoderPin2 = 12; // D6
+const int motorIn3 = 0; // D3
+const int motorIn4 = 2; // D4
+
+const int motor2EncoderPin1 = 14; // D5
+const int motor2EncoderPin2 = 12; // D6
+// const int motor1EncoderPin3 = 13; // D7
+// const int motor1EncoderPin4 = 15; // D8
 
 const bool reverseMotor1 = false;
 const bool reverseMotor2 = false;
@@ -26,6 +31,8 @@ void setup() {
 
   pinMode(motorIn1, OUTPUT);
   pinMode(motorIn2, OUTPUT);
+  pinMode(motorIn3, OUTPUT);
+  pinMode(motorIn4, OUTPUT);
 
   pinMode(motor1EncoderPin1, INPUT);
   pinMode(motor1EncoderPin2, INPUT);
@@ -118,7 +125,7 @@ void loop() {
     Serial.println("New client connected");
 
     // Read data from the client
-    // while (client.connected()) {
+    while (client.connected()) {
       if (client.available()) {
         byte buffer[14];
         client.readBytes(buffer, 14);
@@ -152,29 +159,30 @@ void loop() {
         // printController();
         controllerUpdate();
       }
-    // }
+    }
+
+    setMotor1(0);
+    setMotor2(0);
 
     // Close the connection
     client.stop();
     Serial.println("Client disconnected");
   }
 
-  static bool direction = false;
-  static int val = 0;
-  if(direction){
-    val++;
-  }else{
-    val--;
-  }
+  // static bool direction = false;
+  // static int val = 0;
+  // if(direction){
+  //   val++;
+  // }else{
+  //   val--;
+  // }
 
 
-  if(val >= 1023 || val <= -1024){
-    direction = !direction;
-  }
+  // if(val >= 1023 || val <= -1024){
+  //   direction = !direction;
+  // }
 
-  setMotor1(val);
-  Serial.println(val);
-
+  // setMotor1(val);
 }
 
 
@@ -222,16 +230,26 @@ void loop() {
 // }
 
 void setMotor1(int speed){
-  Serial.println(speed);
   if(speed > 0){
     analogWrite(motorIn1, !reverseMotor1 ? speed : 0);
     analogWrite(motorIn2,  reverseMotor1 ? speed : 0);
   }else{
-    analogWrite(motorIn1, !reverseMotor1 ? abs(speed) : 0);
-    analogWrite(motorIn2,  reverseMotor1 ? abs(speed) : 0);
+    analogWrite(motorIn1,  reverseMotor1 ? abs(speed) : 0);
+    analogWrite(motorIn2, !reverseMotor1 ? abs(speed) : 0);
+  }
+}
+
+void setMotor2(int speed){
+  if(speed > 0){
+    analogWrite(motorIn3, !reverseMotor2 ? speed : 0);
+    analogWrite(motorIn4,  reverseMotor2 ? speed : 0);
+  }else{
+    analogWrite(motorIn3,  reverseMotor2 ? abs(speed) : 0);
+    analogWrite(motorIn4, !reverseMotor2 ? abs(speed) : 0);
   }
 }
 
 void controllerUpdate() {
-  // setMotor1((int)((double)axis_ls_y/32));
+  setMotor1((int)((double)axis_ls_y/32));
+  setMotor2((int)((double)axis_rs_x/32));
 }
